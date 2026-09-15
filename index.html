@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}body{margin:0;font:14px system-ui;background:#f2f4f8}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Laboratorio de Factorización LU</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@500;700;900&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#f2f4f8; --panel:#ffffff; --panel-2:#e9edf4;
+    --line:#cdd6e4; --line-soft:#dfe5ef;
+    --ink:#101c33; --ink-2:#3c4a63; --ink-3:#6b7a93;
+    --brand:#14366b; --brand-soft:#e4ebf7;
+    --amber:#c8890a; --amber-soft:#fbf0d6;
+    --ok:#1d7a5f; --ok-soft:#dff0e9; --crit:#a32330;
+    --shadow:0 1px 2px rgba(16,28,51,.07),0 8px 24px -16px rgba(16,28,51,.4);
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --body:"Source Sans 3",system-ui,-apple-system,Segoe UI,sans-serif;
+    --display:"Chivo","Source Sans 3",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0c1422; --panel:#131d30; --panel-2:#1a2639;
+      --line:#2b3a53; --line-soft:#223047;
+      --ink:#e7ecf5; --ink-2:#b2bed3; --ink-3:#8494ad;
+      --brand:#7fa5e0; --brand-soft:#1b2b47;
+      --amber:#e8b64a; --amber-soft:#332a14;
+      --ok:#5fc39c; --ok-soft:#14322a; --crit:#ef7b86;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0c1422; --panel:#131d30; --panel-2:#1a2639;
+    --line:#2b3a53; --line-soft:#223047;
+    --ink:#e7ecf5; --ink-2:#b2bed3; --ink-3:#8494ad;
+    --brand:#7fa5e0; --brand-soft:#1b2b47;
+    --amber:#e8b64a; --amber-soft:#332a14;
+    --ok:#5fc39c; --ok-soft:#14322a; --crit:#ef7b86;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -18px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 18px;padding-block:0 48px}
+
+  .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--ground) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar-in{max-width:1240px;margin:0 auto;padding:9px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .mark{font-family:var(--display);font-weight:900;letter-spacing:-.02em;font-size:14px;white-space:nowrap}
+  .mark span{color:var(--amber)}
+  .bar .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+  .seg{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+  .seg button{border:0;border-radius:0;background:var(--panel);padding:6px 11px;font-size:12.5px}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button[aria-pressed="true"]{background:var(--brand);color:var(--ground)}
+  .sizer{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--ink-3);border:1px solid var(--line);border-radius:5px;padding:3px 7px}
+  .sizer b{color:var(--ink);font-size:14px;min-width:1.5ch;text-align:center}
+  .stepper{display:flex;gap:3px}
+  .stepper button{width:24px;height:24px;padding:0;font-size:15px;line-height:1;display:grid;place-items:center}
+  button{font-family:var(--body);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 11px;border-radius:4px}
+  button:hover:enabled{border-color:var(--brand);color:var(--brand)}
+  .seg button:hover:enabled{color:var(--brand)}
+  .seg button[aria-pressed="true"]:hover{color:var(--ground)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--brand);border-color:var(--brand);color:var(--ground)}
+  button.primary:hover:enabled{color:var(--ground);opacity:.88}
+  .toggle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+  input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  .app{display:grid;grid-template-columns:minmax(290px,340px) 1fr;gap:16px;align-items:start;padding-block:16px}
+  @media (max-width:920px){.app{grid-template-columns:1fr}}
+  .col{display:grid;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);overflow:hidden}
+  .card > header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--line-soft);background:var(--panel-2)}
+  .card > header h2{margin:0;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+  .bd{padding:14px}
+  .bd.tight{padding:0}
+
+  .xscroll{overflow-x:auto}
+  .eqgrid{display:grid;gap:5px;align-items:center;min-width:max-content}
+  .eqgrid .plus,.eqgrid .eq{font-family:var(--mono);color:var(--ink-3);text-align:center;font-size:13px}
+  .eqgrid .vh{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-align:center}
+  .eqgrid .rl{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);white-space:nowrap;padding-right:5px}
+  input[type="number"]{width:58px;font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;text-align:right;padding:5px 6px;border:1px solid var(--line);border-radius:4px;background:var(--ground);color:var(--ink);-moz-appearance:textfield}
+  input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input.bv{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 45%,var(--line))}
+  .rowbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+  .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink-3)}
+  .chip.ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 40%,transparent);color:var(--ok)}
+  .chip.ok::before{background:var(--ok)}
+  .chip.bad{background:color-mix(in srgb,var(--crit) 12%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent);color:var(--crit)}
+  .chip.bad::before{background:var(--crit)}
+
+  .bvec{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border:1px solid var(--line-soft);border-radius:5px;background:var(--panel-2);margin-bottom:7px}
+  .bvec:last-child{margin-bottom:0}
+  .bvec input{width:54px;background:var(--panel)}
+  .bvec button.nm{border:0;background:none;padding:0;font-family:var(--mono);color:var(--amber);cursor:pointer;min-width:3ch;font-size:12px}
+  .bvec button.rm{padding:3px 7px;font-size:11.5px;margin-left:auto}
+  .bvec.active{border-color:var(--amber)}
+
+  table{border-collapse:collapse;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;width:100%}
+  th,td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  th{font-weight:500;color:var(--ink-3);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--panel-2)}
+  tr:last-child td{border-bottom:0}
+  td.zero{color:var(--ink-3)}
+  td.diag{background:var(--brand-soft);font-weight:600}
+  td.mult{background:var(--amber-soft);color:var(--amber);font-weight:600}
+  td.piv{background:var(--amber-soft);font-weight:600;color:var(--amber)}
+  td.pend{color:var(--ink-3);opacity:.45}
+  td.bcol,th.bcol{background:color-mix(in srgb,var(--amber-soft) 60%,transparent);border-left:2px solid color-mix(in srgb,var(--amber) 50%,transparent)}
+  td.lbl,th.lbl{text-align:left;color:var(--ink-3);font-size:11.5px}
+  .minitables{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;padding:14px}
+  .mini{border:1px solid var(--line-soft);border-radius:5px;overflow:hidden}
+  .mini > b{display:block;padding:6px 10px;background:var(--panel-2);border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+
+  .step{border-bottom:1px solid var(--line-soft)}
+  .step:last-child{border-bottom:0}
+  .step > .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--panel-2)}
+  .kbadge{font-family:var(--mono);font-size:10.5px;color:var(--ground);background:var(--amber);border-radius:3px;padding:2px 6px;font-weight:600}
+  .step .hd .txt{font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+  .step .hd .txt b{color:var(--amber)}
+  .step .body{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:14px;padding:12px 14px}
+  .step .body.wide{grid-template-columns:1fr}
+  @media (max-width:640px){.step .body{grid-template-columns:1fr}}
+  .ops{display:grid;gap:4px;align-content:start}
+  .ops div{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--panel-2);padding:5px 8px;border-radius:4px;overflow-x:auto}
+  .ops div b{color:var(--amber);font-weight:600}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:520px){.pair{grid-template-columns:1fr}}
+
+  .solvebox{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media (max-width:720px){.solvebox{grid-template-columns:1fr}}
+  .solvebox > div{padding:14px}
+  .solvebox > div + div{border-left:1px solid var(--line-soft)}
+  @media (max-width:720px){.solvebox > div + div{border-left:0;border-top:1px solid var(--line-soft)}}
+  .solvebox h3{margin:0 0 9px;font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  .lines{display:grid;gap:5px;font-family:var(--mono);font-size:12.5px}
+  .lines div{padding:5px 8px;background:var(--panel-2);border-radius:4px;overflow-x:auto;white-space:nowrap;color:var(--ink-2)}
+  .lines div em{font-style:normal;color:var(--ink);font-weight:600}
+
+  .xtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--line-soft)}
+  .xtiles > div{background:var(--panel);padding:12px 14px}
+  .xtiles small{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);display:block}
+  .xtiles strong{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;display:block;margin-top:2px;font-variant-numeric:tabular-nums}
+
+  .note{padding:10px 14px;font-size:13px;color:var(--ink-2);background:var(--panel-2);border-bottom:1px solid var(--line-soft)}
+  .note b{color:var(--ink)}
+  .note.bad{background:color-mix(in srgb,var(--crit) 10%,transparent);color:var(--crit)}
+
+  details{border-top:1px solid var(--line)}
+  summary{cursor:pointer;padding:11px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ ";color:var(--amber)}
+  details[open] summary::before{content:"▾ "}
+  pre{font-family:var(--mono);font-size:12px;line-height:1.55;margin:0;padding:0 14px 14px;overflow-x:auto;color:var(--ink)}
+  .cmt{color:var(--ink-3)} .kw{color:var(--brand);font-weight:600} .str{color:var(--ok)} .num{color:var(--amber)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="bar">
+  <div class="bar-in">
+    <div class="mark">UNIDAD 2 · <span>SEL</span> · A·x = b</div>
+    <div class="tools">
+      <div class="seg" id="methods" role="group" aria-label="Método de factorización">
+        <button data-m="doolittle" aria-pressed="true">Doolittle</button>
+        <button data-m="crout" aria-pressed="false">Crout</button>
+        <button data-m="cholesky" aria-pressed="false">Cholesky</button>
+      </div>
+      <div class="sizer"><span>n =</span><b id="nval">3</b>
+        <div class="stepper"><button id="minus" aria-label="Quitar ecuación">−</button><button id="plus" aria-label="Agregar ecuación">+</button></div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="pivot"> Pivoteo</label>
+      <button class="primary" id="btn-demo">Caso clúster</button>
+      <button id="btn-sym">Simétrica</button>
+      <button id="btn-rand">Aleatorio</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="app">
+
+  <div class="col">
+    <div class="card">
+      <header><h2>Sistema</h2><span class="chip" id="detchip"></span></header>
+      <div class="bd">
+        <div class="xscroll"><div class="eqgrid" id="editor"></div></div>
+        <div class="rowbtns"><button id="btn-clear">Vaciar</button><button id="addb">+ Vector b</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>Vectores b</h2><span class="chip" id="costchip"></span></header>
+      <div class="bd" id="bvecs"></div>
+    </div>
+
+    <div class="card">
+      <header><h2>Solución del b activo</h2><span class="chip" id="reschip"></span></header>
+      <div class="xtiles" id="xtiles"></div>
+      <div class="bd tight"><div class="xscroll"><table id="restab"></table></div></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <header><h2>Cómo se resuelve</h2><span class="chip" id="methchip"></span></header>
+      <div id="note"></div>
+      <div id="steps"></div>
+    </div>
+
+    <div class="card">
+      <header><h2>Factores</h2><span class="chip" id="errchip"></span></header>
+      <div class="minitables">
+        <div class="mini"><b id="hdL">L</b><table id="matL"></table></div>
+        <div class="mini"><b id="hdU">U</b><table id="matU"></table></div>
+        <div class="mini"><b id="hdLU">L · U</b><table id="matLU"></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>Sustituciones</h2></header>
+      <div class="solvebox">
+        <div><h3>1 · L·y = b (progresiva)</h3><div class="lines" id="fwd"></div></div>
+        <div><h3>2 · U·x = y (regresiva)</h3><div class="lines" id="bwd"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>Todos los vectores b con la misma factorización</h2></header>
+      <div class="xscroll"><table id="waves"></table></div>
+      <details>
+        <summary>Algoritmo en Python — los tres métodos</summary>
+<pre><span class="kw">import</span> math
+
+<span class="kw">def</span> doolittle(A):                          <span class="cmt"># L con diagonal 1</span>
+    n = len(A)
+    L = [[<span class="num">1.0</span> <span class="kw">if</span> i == j <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> j <span class="kw">in</span> range(n)] <span class="kw">for</span> i <span class="kw">in</span> range(n)]
+    U = [row[:] <span class="kw">for</span> row <span class="kw">in</span> A]
+    <span class="kw">for</span> k <span class="kw">in</span> range(n):
+        <span class="kw">for</span> i <span class="kw">in</span> range(k + <span class="num">1</span>, n):
+            m = U[i][k] / U[k][k]; L[i][k] = m
+            <span class="kw">for</span> j <span class="kw">in</span> range(k, n): U[i][j] -= m * U[k][j]
+    <span class="kw">return</span> L, U
+
+<span class="kw">def</span> crout(A):                              <span class="cmt"># U con diagonal 1</span>
+    n = len(A)
+    L = [[<span class="num">0.0</span>]*n <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
+    U = [[<span class="num">1.0</span> <span class="kw">if</span> i == j <span class="kw">else</span> <span class="num">0.0</span> <span class="kw">for</span> j <span class="kw">in</span> range(n)] <span class="kw">for</span> i <span class="kw">in</span> range(n)]
+    <span class="kw">for</span> j <span class="kw">in</span> range(n):
+        <span class="kw">for</span> i <span class="kw">in</span> range(j, n):
+            L[i][j] = A[i][j] - sum(L[i][k]*U[k][j] <span class="kw">for</span> k <span class="kw">in</span> range(j))
+        <span class="kw">for</span> i <span class="kw">in</span> range(j + <span class="num">1</span>, n):
+            U[j][i] = (A[j][i] - sum(L[j][k]*U[k][i] <span class="kw">for</span> k <span class="kw">in</span> range(j))) / L[j][j]
+    <span class="kw">return</span> L, U
+
+<span class="kw">def</span> cholesky(A):                           <span class="cmt"># A simétrica definida positiva</span>
+    n = len(A)
+    L = [[<span class="num">0.0</span>]*n <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
+    <span class="kw">for</span> j <span class="kw">in</span> range(n):
+        L[j][j] = math.sqrt(A[j][j] - sum(L[j][k]**<span class="num">2</span> <span class="kw">for</span> k <span class="kw">in</span> range(j)))
+        <span class="kw">for</span> i <span class="kw">in</span> range(j + <span class="num">1</span>, n):
+            L[i][j] = (A[i][j] - sum(L[i][k]*L[j][k] <span class="kw">for</span> k <span class="kw">in</span> range(j))) / L[j][j]
+    U = [[L[j][i] <span class="kw">for</span> j <span class="kw">in</span> range(n)] <span class="kw">for</span> i <span class="kw">in</span> range(n)]   <span class="cmt"># U = L transpuesta</span>
+    <span class="kw">return</span> L, U
+
+<span class="kw">def</span> resolver(L, U, b):                     <span class="cmt"># sirve para los tres</span>
+    n = len(b); y = [<span class="num">0.0</span>]*n; x = [<span class="num">0.0</span>]*n
+    <span class="kw">for</span> i <span class="kw">in</span> range(n):
+        y[i] = (b[i] - sum(L[i][j]*y[j] <span class="kw">for</span> j <span class="kw">in</span> range(i))) / L[i][i]
+    <span class="kw">for</span> i <span class="kw">in</span> range(n-<span class="num">1</span>, -<span class="num">1</span>, -<span class="num">1</span>):
+        x[i] = (y[i] - sum(U[i][j]*x[j] <span class="kw">for</span> j <span class="kw">in</span> range(i+<span class="num">1</span>, n))) / U[i][i]
+    <span class="kw">return</span> y, x
+
+A = [[<span class="num">4</span>,<span class="num">2</span>,<span class="num">1</span>],[<span class="num">12</span>,<span class="num">10</span>,<span class="num">5</span>],[-<span class="num">8</span>,<span class="num">8</span>,<span class="num">7</span>]]
+L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n^3)</span>
+<span class="kw">for</span> b <span class="kw">in</span> ([<span class="num">14</span>,<span class="num">46</span>,<span class="num">26</span>], [<span class="num">20</span>,<span class="num">62</span>,<span class="num">30</span>]):
+    print(resolver(L, U, b))               <span class="cmt"># O(n^2) por vector</span></pre>
+      </details>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+(function(){
+  var DEMO={n:3,A:[[4,2,1],[12,10,5],[-8,8,7]],b:[[14,46,26],[20,62,30]]};
+  var SYM={n:3,A:[[4,-2,2],[-2,10,-7],[2,-7,30]],b:[[14,-43,106]]};
+  var n=DEMO.n, A=DEMO.A.map(function(r){return r.slice();}), bs=DEMO.b.map(function(r){return r.slice();}), act=0, method="doolittle";
+  var $=function(id){return document.getElementById(id);};
+
+  function fmt(v){
+    if(v===undefined||v===null||!isFinite(v)) return "—";
+    var r=Math.round(v*1e9)/1e9;
+    if(Math.abs(r)<1e-12) return "0";
+    if(Math.abs(r-Math.round(r))<1e-9) return String(Math.round(r));
+    if(Math.abs(r)>=1e5||Math.abs(r)<1e-4) return r.toExponential(2);
+    return String(Math.round(r*1e4)/1e4);
+  }
+  function sb(i){ var d="₀₁₂₃₄₅₆₇₈₉",s="",t=String(i),k; for(k=0;k<t.length;k++) s+=d[+t[k]]; return s; }
+  function zeros(){ var M=[],i; for(i=0;i<n;i++) M.push(new Array(n).fill(0)); return M; }
+  function copy(M){ return M.map(function(r){return r.slice();}); }
+
+  /* ---------- editor ---------- */
+  function cell(cls,txt){ var e=document.createElement("div"); e.className=cls; e.textContent=txt; return e; }
+  function buildEditor(){
+    var g=$("editor"),i,j;
+    g.innerHTML="";
+    var cols=["auto"]; for(j=0;j<n;j++){ cols.push("auto"); if(j<n-1) cols.push("auto"); }
+    cols.push("auto","auto");
+    g.style.gridTemplateColumns=cols.join(" ");
+    g.appendChild(cell("rl",""));
+    for(j=0;j<n;j++){ g.appendChild(cell("vh","x"+sb(j+1))); if(j<n-1) g.appendChild(cell("plus","")); }
+    g.appendChild(cell("eq","")); g.appendChild(cell("vh","b"+sb(act+1)));
+    for(i=0;i<n;i++){
+      g.appendChild(cell("rl","E"+(i+1)));
+      for(j=0;j<n;j++){
+        var e=document.createElement("input");
+        e.type="number"; e.step="any"; e.value=A[i][j]; e.id="a"+i+"_"+j;
+        e.dataset.k="A"; e.dataset.i=i; e.dataset.j=j;
+        e.setAttribute("aria-label","Coeficiente E"+(i+1)+" x"+(j+1));
+        g.appendChild(e);
+        if(j<n-1) g.appendChild(cell("plus","+"));
+      }
+      g.appendChild(cell("eq","="));
+      var eb=document.createElement("input");
+      eb.type="number"; eb.step="any"; eb.value=bs[act][i]; eb.id="b"+i; eb.className="bv";
+      eb.dataset.k="b"; eb.dataset.i=i;
+      eb.setAttribute("aria-label","b componente "+(i+1));
+      g.appendChild(eb);
+    }
+    $("nval").textContent=n; $("minus").disabled=n<=2; $("plus").disabled=n>=8;
+  }
+  $("editor").addEventListener("input",function(e){
+    var t=e.target; if(t.tagName!=="INPUT") return;
+    var v=parseFloat(t.value); if(isNaN(v)) v=0;
+    if(t.dataset.k==="A") A[+t.dataset.i][+t.dataset.j]=v;
+    else { bs[act][+t.dataset.i]=v; var m=$("bv"+act+"_"+t.dataset.i); if(m) m.value=v; }
+    render();
+  });
+
+  function resize(nn){
+    var old=n; n=nn; var NA=[],i,j;
+    for(i=0;i<n;i++){ NA.push([]); for(j=0;j<n;j++) NA[i].push(i<old&&j<old?A[i][j]:(i===j?1:0)); }
+    A=NA;
+    bs=bs.map(function(v){ var o=[],k; for(k=0;k<n;k++) o.push(k<old?v[k]:0); return o; });
+    buildEditor(); buildB(); render();
+  }
+  $("plus").onclick=function(){ if(n<8) resize(n+1); };
+  $("minus").onclick=function(){ if(n>2) resize(n-1); };
+  function load(P){ n=P.n; A=P.A.map(function(r){return r.slice();}); bs=P.b.map(function(r){return r.slice();}); act=0; buildEditor(); buildB(); render(); }
+  $("btn-demo").onclick=function(){ load(DEMO); };
+  $("btn-sym").onclick=function(){ load(SYM); };
+  $("btn-clear").onclick=function(){ A=A.map(function(r,i){return r.map(function(_,j){return i===j?1:0;});}); buildEditor(); render(); };
+  $("btn-rand").onclick=function(){
+    var i,j;
+    if(method==="cholesky"){
+      var B=[]; for(i=0;i<n;i++){ B.push([]); for(j=0;j<n;j++) B[i].push(Math.round(Math.random()*6-3)); }
+      for(i=0;i<n;i++) for(j=0;j<n;j++){ var s=0,k; for(k=0;k<n;k++) s+=B[i][k]*B[j][k]; A[i][j]=s+(i===j?n:0); }
+    } else {
+      for(i=0;i<n;i++){ var t=0;
+        for(j=0;j<n;j++) if(i!==j){ A[i][j]=Math.round(Math.random()*10-5); t+=Math.abs(A[i][j]); }
+        A[i][i]=t+1+Math.round(Math.random()*4);
+      }
+    }
+    bs=bs.map(function(v){ return v.map(function(){ return Math.round(Math.random()*40-10); }); });
+    buildEditor(); buildB(); render();
+  };
+  $("pivot").onchange=render;
+  $("addb").onclick=function(){ bs.push(bs[act].slice()); act=bs.length-1; buildB(); buildEditor(); render(); };
+  $("methods").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    method=b.dataset.m;
+    Array.prototype.forEach.call(this.querySelectorAll("button"),function(x){ x.setAttribute("aria-pressed",String(x===b)); });
+    $("pivot").disabled=(method!=="doolittle");
+    if(method!=="doolittle") $("pivot").checked=false;
+    render();
+  });
+
+  /* ---------- b vectors ---------- */
+  function buildB(){
+    var c=$("bvecs"); c.innerHTML="";
+    bs.forEach(function(v,idx){
+      var row=document.createElement("div");
+      row.className="bvec"+(idx===act?" active":"");
+      var nm=document.createElement("button");
+      nm.className="nm"; nm.textContent="b"+sb(idx+1); nm.title="Activar este vector";
+      nm.onclick=function(){ act=idx; buildB(); buildEditor(); render(); };
+      row.appendChild(nm);
+      v.forEach(function(val,i){
+        var inp=document.createElement("input");
+        inp.type="number"; inp.step="any"; inp.value=val; inp.id="bv"+idx+"_"+i;
+        inp.setAttribute("aria-label","b"+(idx+1)+" componente "+(i+1));
+        inp.oninput=function(){ var x=parseFloat(inp.value); bs[idx][i]=isNaN(x)?0:x;
+          if(idx===act){ var m=$("b"+i); if(m) m.value=bs[idx][i]; } render(); };
+        row.appendChild(inp);
+      });
+      if(bs.length>1){
+        var del=document.createElement("button");
+        del.className="rm"; del.textContent="✕"; del.title="Quitar vector";
+        del.onclick=function(){ bs.splice(idx,1); if(act>=bs.length) act=bs.length-1; buildB(); buildEditor(); render(); };
+        row.appendChild(del);
+      }
+      c.appendChild(row);
+    });
+  }
+
+  /* ---------- factorizaciones ---------- */
+  function facDoolittle(M,bv,usePivot){
+    var L=zeros(),U=copy(M),perm=[],steps=[],ok=true,swaps=0,i,j,k;
+    for(i=0;i<n;i++){ L[i][i]=1; perm.push(i); }
+    var rhs=bv.slice();
+    steps.push({init:true,M:copy(U),rhs:rhs.slice()});
+    for(k=0;k<n;k++){
+      var swap=null;
+      if(usePivot){
+        var best=k;
+        for(i=k+1;i<n;i++) if(Math.abs(U[i][k])>Math.abs(U[best][k])) best=i;
+        if(best!==k){
+          var t=U[k]; U[k]=U[best]; U[best]=t;
+          for(j=0;j<k;j++){ var tl=L[k][j]; L[k][j]=L[best][j]; L[best][j]=tl; }
+          var tp=perm[k]; perm[k]=perm[best]; perm[best]=tp;
+          var tr=rhs[k]; rhs[k]=rhs[best]; rhs[best]=tr;
+          swaps++; swap=[k,best];
+        }
+      }
+      if(Math.abs(U[k][k])<1e-12){ ok=false; steps.push({k:k,dead:"pivote nulo en u"+sb(k+1)+sb(k+1)}); break; }
+      var ops=[];
+      for(i=k+1;i<n;i++){
+        var m=U[i][k]/U[k][k]; L[i][k]=m;
+        for(j=k;j<n;j++) U[i][j]-=m*U[k][j];
+        U[i][k]=0; rhs[i]-=m*rhs[k];
+        ops.push("m"+sb(i+1)+sb(k+1)+" = a"+sb(i+1)+sb(k+1)+" / u"+sb(k+1)+sb(k+1)+" = <b>"+fmt(m)+"</b><br>F"+(i+1)+" ← F"+(i+1)+" − ("+fmt(m)+")·F"+(k+1));
+      }
+      steps.push({k:k,head:"pivote u"+sb(k+1)+sb(k+1)+" = <b>"+fmt(U[k][k])+"</b> · se anula la columna "+(k+1)+" debajo",
+                  swap:swap,ops:ops,M:copy(U),rhs:rhs.slice(),aug:true});
+    }
+    return {L:L,U:U,perm:perm,steps:steps,ok:ok,swaps:swaps};
+  }
+
+  function facCrout(M){
+    var L=zeros(),U=zeros(),steps=[],ok=true,i,j,k;
+    for(i=0;i<n;i++) U[i][i]=1;
+    for(j=0;j<n&&ok;j++){
+      var ops=[];
+      for(i=j;i<n;i++){
+        var s=0,txt="l"+sb(i+1)+sb(j+1)+" = a"+sb(i+1)+sb(j+1);
+        for(k=0;k<j;k++){ s+=L[i][k]*U[k][j]; txt+=" − l"+sb(i+1)+sb(k+1)+"·u"+sb(k+1)+sb(j+1); }
+        L[i][j]=M[i][j]-s;
+        ops.push(txt+" = <b>"+fmt(L[i][j])+"</b>");
+      }
+      if(Math.abs(L[j][j])<1e-12){ ok=false; steps.push({k:j,dead:"l"+sb(j+1)+sb(j+1)+" = 0: Crout no puede dividir"}); break; }
+      for(i=j+1;i<n;i++){
+        var s2=0,t2="u"+sb(j+1)+sb(i+1)+" = ( a"+sb(j+1)+sb(i+1);
+        for(k=0;k<j;k++){ s2+=L[j][k]*U[k][i]; t2+=" − l"+sb(j+1)+sb(k+1)+"·u"+sb(k+1)+sb(i+1); }
+        U[j][i]=(M[j][i]-s2)/L[j][j];
+        ops.push(t2+" ) / l"+sb(j+1)+sb(j+1)+" = <b>"+fmt(U[j][i])+"</b>");
+      }
+      steps.push({k:j,head:"columna "+(j+1)+" de L y fila "+(j+1)+" de U",ops:ops,L:copy(L),U:copy(U),done:j});
+    }
+    return {L:L,U:U,perm:null,steps:steps,ok:ok,swaps:0};
+  }
+
+  function facCholesky(M){
+    var L=zeros(),steps=[],ok=true,i,j,k;
+    for(j=0;j<n&&ok;j++){
+      var ops=[],s=0,txt="l"+sb(j+1)+sb(j+1)+" = √( a"+sb(j+1)+sb(j+1);
+      for(k=0;k<j;k++){ s+=L[j][k]*L[j][k]; txt+=" − l"+sb(j+1)+sb(k+1)+"²"; }
+      var rad=M[j][j]-s;
+      if(rad<=1e-12){ ok=false; steps.push({k:j,dead:"radicando "+fmt(rad)+" ≤ 0: la matriz no es definida positiva"}); break; }
+      L[j][j]=Math.sqrt(rad);
+      ops.push(txt+" ) = √"+fmt(rad)+" = <b>"+fmt(L[j][j])+"</b>");
+      for(i=j+1;i<n;i++){
+        var s2=0,t2="l"+sb(i+1)+sb(j+1)+" = ( a"+sb(i+1)+sb(j+1);
+        for(k=0;k<j;k++){ s2+=L[i][k]*L[j][k]; t2+=" − l"+sb(i+1)+sb(k+1)+"·l"+sb(j+1)+sb(k+1); }
+        L[i][j]=(M[i][j]-s2)/L[j][j];
+        ops.push(t2+" ) / l"+sb(j+1)+sb(j+1)+" = <b>"+fmt(L[i][j])+"</b>");
+      }
+      var Ut=zeros(); for(i=0;i<n;i++) for(k=0;k<n;k++) Ut[i][k]=L[k][i];
+      steps.push({k:j,head:"columna "+(j+1)+" de L",ops:ops,L:copy(L),U:Ut,done:j});
+    }
+    var U=zeros(); for(i=0;i<n;i++) for(j=0;j<n;j++) U[i][j]=L[j][i];
+    return {L:L,U:U,perm:null,steps:steps,ok:ok,swaps:0};
+  }
+
+  function solve(L,U,bv,perm){
+    var y=new Array(n).fill(0),x=new Array(n).fill(0),i,j,s;
+    var pb=perm?perm.map(function(p){return bv[p];}):bv;
+    for(i=0;i<n;i++){ s=pb[i]; for(j=0;j<i;j++) s-=L[i][j]*y[j]; y[i]=s/L[i][i]; }
+    for(i=n-1;i>=0;i--){ s=y[i]; for(j=i+1;j<n;j++) s-=U[i][j]*x[j]; x[i]=s/U[i][i]; }
+    return {y:y,x:x};
+  }
+
+  function tbl(M,kind,rhs,activeK,limit){
+    var h="",i,j;
+    h+="<tr>";
+    for(j=0;j<n;j++) h+="<th>"+(kind==="aug"?"x"+sb(j+1):String(j+1))+"</th>";
+    if(rhs) h+="<th class='bcol'>b</th>";
+    h+="</tr>";
+    for(i=0;i<n;i++){
+      h+="<tr>";
+      for(j=0;j<n;j++){
+        var v=M[i][j],c=[];
+        if(Math.abs(v)<1e-12) c.push("zero");
+        if((kind==="L"||kind==="U")&&i===j) c.push("diag");
+        if(kind==="L"&&j<i&&Math.abs(v)>1e-12) c.push("mult");
+        if(activeK!==undefined&&i===activeK&&j===activeK) c.push("piv");
+        if(limit!==undefined){
+          var known=(kind==="L")?(j<=limit):(i<=limit);
+          if(!known) c.push("pend");
+        }
+        h+='<td class="'+c.join(" ")+'">'+fmt(v)+"</td>";
+      }
+      if(rhs) h+='<td class="bcol">'+fmt(rhs[i])+"</td>";
+      h+="</tr>";
+    }
+    return h;
+  }
+
+  /* ---------- render ---------- */
+  function render(){
+    var usePivot=$("pivot").checked&&method==="doolittle";
+    var b0=bs[act],i,j,h,r;
+
+    var symErr=0;
+    for(i=0;i<n;i++) for(j=0;j<n;j++) symErr=Math.max(symErr,Math.abs(A[i][j]-A[j][i]));
+
+    if(method==="doolittle") r=facDoolittle(A,b0,usePivot);
+    else if(method==="crout") r=facCrout(A);
+    else r=facCholesky(A);
+
+    var L=r.L,U=r.U,PA=r.perm?r.perm.map(function(p){return A[p];}):A;
+
+    var nt="";
+    if(method==="doolittle") nt="<b>Doolittle:</b> L lleva 1 en la diagonal y guarda los multiplicadores; U es lo que queda de la eliminación gaussiana.";
+    if(method==="crout") nt="<b>Crout:</b> la diagonal unitaria va en U; L se llena por columnas y U por filas, sin eliminación previa.";
+    if(method==="cholesky") nt="<b>Cholesky:</b> A = L·Lᵀ. Solo existe si A es simétrica y definida positiva, y cuesta la mitad que LU.";
+    if(method==="cholesky"&&symErr>1e-9) $("note").innerHTML='<div class="note bad">A no es simétrica (diferencia máxima '+fmt(symErr)+" respecto de Aᵀ). Cholesky no aplica: usa el botón <b>Simétrica</b> o cambia a Doolittle.</div>";
+    else $("note").innerHTML='<div class="note">'+nt+"</div>";
+
+    h="";
+    r.steps.forEach(function(st){
+      if(st.init){
+        h+='<div class="step"><div class="hd"><span class="kbadge">inicio</span><span class="txt">matriz aumentada [ A | b'+sb(act+1)+' ]</span></div>'+
+           '<div class="body wide"><div class="xscroll"><table>'+tbl(st.M,"aug",st.rhs)+"</table></div></div></div>";
+        return;
+      }
+      if(st.dead){
+        h+='<div class="step"><div class="hd"><span class="kbadge">k='+(st.k+1)+'</span><span class="txt">'+st.dead+"</span></div></div>";
+        return;
+      }
+      var ops="";
+      if(st.swap) ops+="<div>intercambio F"+(st.swap[0]+1)+" ↔ F"+(st.swap[1]+1)+" (mayor |a| en la columna)</div>";
+      if(!st.ops.length) ops+="<div>sin operaciones en este paso</div>";
+      st.ops.forEach(function(o){ ops+="<div>"+o+"</div>"; });
+      var right;
+      if(st.aug) right='<div class="xscroll"><table>'+tbl(st.M,"aug",st.rhs,st.k)+"</table></div>";
+      else right='<div class="pair"><div class="mini"><b>L</b><table>'+tbl(st.L,"L",null,undefined,st.done)+
+                 '</table></div><div class="mini"><b>'+(method==="cholesky"?"Lᵀ":"U")+'</b><table>'+tbl(st.U,"U",null,undefined,st.done)+"</table></div></div>";
+      h+='<div class="step"><div class="hd"><span class="kbadge">k='+(st.k+1)+'</span><span class="txt">'+st.head+'</span></div>'+
+         '<div class="body"><div class="ops">'+ops+"</div>"+right+"</div></div>";
+    });
+    $("steps").innerHTML=h;
+
+    $("hdL").textContent="L";
+    $("hdU").textContent=(method==="cholesky")?"Lᵀ":"U";
+    $("matL").innerHTML=tbl(L,"L");
+    $("matU").innerHTML=tbl(U,"U");
+    var LU=zeros();
+    for(i=0;i<n;i++) for(j=0;j<n;j++){ var s=0,k; for(k=0;k<n;k++) s+=L[i][k]*U[k][j]; LU[i][j]=s; }
+    $("matLU").innerHTML=tbl(LU,"");
+    $("hdLU").textContent=(method==="cholesky")?"L · Lᵀ = A":((usePivot&&r.swaps)?"L · U = P·A":"L · U = A");
+
+    var det=1;
+    if(method==="cholesky"){ for(i=0;i<n;i++) det*=L[i][i]*L[i][i]; }
+    else { for(i=0;i<n;i++) det*=L[i][i]*U[i][i]; if(usePivot&&r.swaps%2) det=-det; }
+    var err=0; for(i=0;i<n;i++) for(j=0;j<n;j++) err=Math.max(err,Math.abs(LU[i][j]-PA[i][j]));
+
+    $("detchip").className="chip "+(r.ok&&Math.abs(det)>1e-10?"ok":"bad");
+    $("detchip").textContent="det = "+(r.ok?fmt(det):"—");
+    $("methchip").className="chip "+(r.ok?"ok":"bad");
+    $("methchip").textContent=r.ok?(method+" · n = "+n+(usePivot?" · pivoteo":"")):"factorización detenida";
+    $("errchip").className="chip "+(r.ok&&err<1e-9?"ok":"bad");
+    $("errchip").textContent=r.ok?"error "+err.toExponential(1):"—";
+
+    if(!r.ok){
+      $("fwd").innerHTML="<div>—</div>"; $("bwd").innerHTML="<div>—</div>";
+      $("xtiles").innerHTML='<div><small>x</small><strong>—</strong></div>';
+      $("restab").innerHTML=""; $("waves").innerHTML="";
+      $("reschip").className="chip bad"; $("reschip").textContent="sin solución";
+      $("costchip").className="chip"; $("costchip").textContent=bs.length+" vectores";
+      return;
+    }
+
+    var perm=usePivot?r.perm:null, sol=solve(L,U,b0,perm),t;
+
+    h="";
+    for(i=0;i<n;i++){
+      t="y"+sb(i+1)+" = ( "+(perm?"b"+sb(perm[i]+1):"b"+sb(i+1));
+      for(j=0;j<i;j++) if(Math.abs(L[i][j])>1e-12) t+=" − ("+fmt(L[i][j])+")·y"+sb(j+1);
+      t+=" ) / "+fmt(L[i][i]);
+      h+="<div>"+t+" = <em>"+fmt(sol.y[i])+"</em></div>";
+    }
+    $("fwd").innerHTML=h;
+
+    h="";
+    for(i=n-1;i>=0;i--){
+      t="x"+sb(i+1)+" = ( y"+sb(i+1);
+      for(j=i+1;j<n;j++) if(Math.abs(U[i][j])>1e-12) t+=" − ("+fmt(U[i][j])+")·x"+sb(j+1);
+      h+="<div>"+t+" ) / "+fmt(U[i][i])+" = <em>"+fmt(sol.x[i])+"</em></div>";
+    }
+    $("bwd").innerHTML=h;
+
+    h=""; for(i=0;i<n;i++) h+='<div><small>x'+sb(i+1)+"</small><strong>"+fmt(sol.x[i])+"</strong></div>";
+    $("xtiles").innerHTML=h;
+
+    h="<tr><th class='lbl'>Ec.</th><th>A·x</th><th>b</th><th>residuo</th></tr>";
+    var maxr=0;
+    for(i=0;i<n;i++){
+      var ax=0; for(j=0;j<n;j++) ax+=A[i][j]*sol.x[j];
+      var res=ax-b0[i]; maxr=Math.max(maxr,Math.abs(res));
+      h+="<tr><td class='lbl'>E"+(i+1)+"</td><td>"+fmt(ax)+"</td><td class='bcol'>"+fmt(b0[i])+"</td><td>"+res.toExponential(1)+"</td></tr>";
+    }
+    $("restab").innerHTML=h;
+    $("reschip").className="chip "+(maxr<1e-8?"ok":"bad");
+    $("reschip").textContent=maxr<1e-8?"A·x = b ✓":"residuo "+maxr.toExponential(1);
+
+    h="<tr><th class='lbl'>Vector</th><th>b</th><th>y</th><th>x</th></tr>";
+    bs.forEach(function(v,idx){
+      var s2=solve(L,U,v,perm);
+      h+="<tr><td class='lbl'>b"+sb(idx+1)+(idx===act?" ●":"")+"</td><td class='bcol'>("+v.map(fmt).join(", ")+")</td><td>("+s2.y.map(fmt).join(", ")+")</td><td>("+s2.x.map(fmt).join(", ")+")</td></tr>";
+    });
+    $("waves").innerHTML=h;
+
+    var fact=Math.round((method==="cholesky"?1:2)*n*n*n/3), per=2*n*n, q=bs.length;
+    $("costchip").className="chip";
+    $("costchip").textContent=(fact+q*per)+" flops vs "+(q*(fact+per))+" recalculando";
+  }
+
+  buildEditor(); buildB(); render();
+})();
+</script>
+
+</body>
+</html>
