@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}body{margin:0;font:14px system-ui;background:#f2f4f8}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Laboratorio de Factorización LU</title>
+<title>Laboratorio de Sistemas Lineales</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@500;700;900&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -149,6 +149,12 @@
   .note b{color:var(--ink)}
   .note.bad{background:color-mix(in srgb,var(--crit) 10%,transparent);color:var(--crit)}
 
+  .prm{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;font-size:13px;color:var(--ink-2)}
+  input.wide{width:100%}
+  .x0lbl{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin:12px 0 6px;letter-spacing:.06em;text-transform:uppercase}
+  .x0row{display:flex;gap:6px;flex-wrap:wrap}
+  tr.conv td{background:var(--ok-soft);color:var(--ok);font-weight:600}
+  td.dx{color:var(--ink-3)}
   details{border-top:1px solid var(--line)}
   summary{cursor:pointer;padding:11px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);list-style:none}
   summary::-webkit-details-marker{display:none}
@@ -169,6 +175,7 @@
         <button data-m="doolittle" aria-pressed="true">Doolittle</button>
         <button data-m="crout" aria-pressed="false">Crout</button>
         <button data-m="cholesky" aria-pressed="false">Cholesky</button>
+        <button data-m="jacobi" aria-pressed="false">Jacobi</button>
       </div>
       <div class="sizer"><span>n =</span><b id="nval">3</b>
         <div class="stepper"><button id="minus" aria-label="Quitar ecuación">−</button><button id="plus" aria-label="Agregar ecuación">+</button></div>
@@ -176,6 +183,7 @@
       <label class="toggle"><input type="checkbox" id="pivot"> Pivoteo</label>
       <button class="primary" id="btn-demo">Caso clúster</button>
       <button id="btn-sym">Simétrica</button>
+      <button id="btn-jac">Caso S7 (4×4)</button>
       <button id="btn-rand">Aleatorio</button>
     </div>
   </div>
@@ -190,6 +198,18 @@
       <div class="bd">
         <div class="xscroll"><div class="eqgrid" id="editor"></div></div>
         <div class="rowbtns"><button id="btn-clear">Vaciar</button><button id="addb">+ Vector b</button></div>
+      </div>
+    </div>
+
+    <div class="card" id="cardParams" hidden>
+      <header><h2>Parámetros de Jacobi</h2></header>
+      <div class="bd">
+        <div class="prm">
+          <label for="tol">Tolerancia ε</label><input type="number" id="tol" value="0.0001" step="any" class="wide">
+          <label for="maxit">Máx. iteraciones</label><input type="number" id="maxit" value="100" step="1" class="wide">
+        </div>
+        <div class="x0lbl">Vector inicial x<sup>(0)</sup></div>
+        <div class="x0row" id="x0row"></div>
       </div>
     </div>
 
@@ -212,7 +232,12 @@
       <div id="steps"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardIter" hidden>
+      <header><h2>Historial de iteraciones</h2><span class="chip" id="iterchip"></span></header>
+      <div class="xscroll" id="itertab"></div>
+    </div>
+
+    <div class="card" id="cardFac">
       <header><h2>Factores</h2><span class="chip" id="errchip"></span></header>
       <div class="minitables">
         <div class="mini"><b id="hdL">L</b><table id="matL"></table></div>
@@ -221,7 +246,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardSust">
       <header><h2>Sustituciones</h2></header>
       <div class="solvebox">
         <div><h3>1 · L·y = b (progresiva)</h3><div class="lines" id="fwd"></div></div>
@@ -229,7 +254,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardWaves">
       <header><h2>Todos los vectores b con la misma factorización</h2></header>
       <div class="xscroll"><table id="waves"></table></div>
       <details>
@@ -290,6 +315,8 @@ L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n
 (function(){
   var DEMO={n:3,A:[[4,2,1],[12,10,5],[-8,8,7]],b:[[14,46,26],[20,62,30]]};
   var SYM={n:3,A:[[4,-2,2],[-2,10,-7],[2,-7,30]],b:[[14,-43,106]]};
+  var JAC={n:4,A:[[10,-2,-1,0],[-1,8,0,-2],[-2,0,12,-3],[0,-1,-2,9]],b:[[15,18,25,20]]};
+  var x0=[0,0,0];
   var n=DEMO.n, A=DEMO.A.map(function(r){return r.slice();}), bs=DEMO.b.map(function(r){return r.slice();}), act=0, method="doolittle";
   var $=function(id){return document.getElementById(id);};
 
@@ -348,13 +375,25 @@ L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n
     for(i=0;i<n;i++){ NA.push([]); for(j=0;j<n;j++) NA[i].push(i<old&&j<old?A[i][j]:(i===j?1:0)); }
     A=NA;
     bs=bs.map(function(v){ var o=[],k; for(k=0;k<n;k++) o.push(k<old?v[k]:0); return o; });
-    buildEditor(); buildB(); render();
+    buildEditor(); buildB(); buildX0(); render();
   }
   $("plus").onclick=function(){ if(n<8) resize(n+1); };
   $("minus").onclick=function(){ if(n>2) resize(n-1); };
-  function load(P){ n=P.n; A=P.A.map(function(r){return r.slice();}); bs=P.b.map(function(r){return r.slice();}); act=0; buildEditor(); buildB(); render(); }
+  function load(P){ n=P.n; A=P.A.map(function(r){return r.slice();}); bs=P.b.map(function(r){return r.slice();}); act=0; buildEditor(); buildB(); buildX0(); render(); }
   $("btn-demo").onclick=function(){ load(DEMO); };
   $("btn-sym").onclick=function(){ load(SYM); };
+  $("btn-jac").onclick=function(){ load(JAC); setMethod("jacobi"); };
+  $("tol").oninput=render; $("maxit").oninput=render;
+  function buildX0(){
+    while(x0.length<n) x0.push(0); x0.length=n;
+    var c=$("x0row"); c.innerHTML="";
+    x0.forEach(function(v,i){
+      var e=document.createElement("input"); e.type="number"; e.step="any"; e.value=v; e.id="x0_"+i;
+      e.setAttribute("aria-label","x0 componente "+(i+1));
+      e.oninput=function(){ var t=parseFloat(e.value); x0[i]=isNaN(t)?0:t; render(); };
+      c.appendChild(e);
+    });
+  }
   $("btn-clear").onclick=function(){ A=A.map(function(r,i){return r.map(function(_,j){return i===j?1:0;});}); buildEditor(); render(); };
   $("btn-rand").onclick=function(){
     var i,j;
@@ -372,13 +411,15 @@ L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n
   };
   $("pivot").onchange=render;
   $("addb").onclick=function(){ bs.push(bs[act].slice()); act=bs.length-1; buildB(); buildEditor(); render(); };
-  $("methods").addEventListener("click",function(e){
-    var b=e.target.closest("button"); if(!b) return;
-    method=b.dataset.m;
-    Array.prototype.forEach.call(this.querySelectorAll("button"),function(x){ x.setAttribute("aria-pressed",String(x===b)); });
+  function setMethod(m){
+    method=m;
+    Array.prototype.forEach.call($("methods").querySelectorAll("button"),function(x){ x.setAttribute("aria-pressed",String(x.dataset.m===m)); });
     $("pivot").disabled=(method!=="doolittle");
     if(method!=="doolittle") $("pivot").checked=false;
     render();
+  }
+  $("methods").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return; setMethod(b.dataset.m);
   });
 
   /* ---------- b vectors ---------- */
@@ -522,7 +563,93 @@ L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n
   }
 
   /* ---------- render ---------- */
+  function renderJacobi(){
+    var i,j,h,b0=bs[act];
+    var tol=parseFloat($("tol").value); if(!(tol>0)) tol=1e-4;
+    var maxit=parseInt($("maxit").value,10); if(!(maxit>0)) maxit=100; if(maxit>500) maxit=500;
+
+    /* EDD */
+    var edd=true, normT=0, zeroDiag=false, rows="";
+    for(i=0;i<n;i++){
+      var d=Math.abs(A[i][i]), s=0, parts=[];
+      for(j=0;j<n;j++) if(j!==i){ s+=Math.abs(A[i][j]); parts.push("|"+fmt(A[i][j])+"|"); }
+      var ok=d>s; edd=edd&&ok; if(d<1e-12) zeroDiag=true;
+      var q=d>0?s/d:Infinity; normT=Math.max(normT,q);
+      rows+="<tr><td class='lbl'>F"+(i+1)+"</td><td>"+fmt(d)+"</td><td>"+parts.join(" + ")+" = "+fmt(s)+"</td><td>"+(ok?"✓":"✗")+"</td><td>"+fmt(q)+"</td></tr>";
+    }
+    var note;
+    if(zeroDiag) note='<div class="note bad">Hay un cero en la diagonal: Jacobi no puede despejar esa variable. Reordena las ecuaciones.</div>';
+    else if(edd) note='<div class="note"><b>A es estrictamente diagonal dominante.</b> ‖T<sub>J</sub>‖<sub>∞</sub> = '+fmt(normT)+' &lt; 1, así que Jacobi converge desde cualquier x<sup>(0)</sup>.</div>';
+    else note='<div class="note bad">A no es diagonal dominante (‖T<sub>J</sub>‖<sub>∞</sub> = '+fmt(normT)+'). Jacobi podría no converger; revisa la tabla de iteraciones.</div>';
+    $("note").innerHTML=note;
+
+    var sch="";
+    for(i=0;i<n;i++){
+      var t="x"+sb(i+1)+"<sup>(k)</sup> = ( "+fmt(b0[i]);
+      for(j=0;j<n;j++) if(j!==i&&Math.abs(A[i][j])>1e-12){
+        var c=-A[i][j]; t+=(c>=0?" + ":" − ")+fmt(Math.abs(c))+"·x"+sb(j+1)+"<sup>(k−1)</sup>";
+      }
+      sch+="<div>"+t+" ) / "+fmt(A[i][i])+"</div>";
+    }
+    $("steps").innerHTML=
+      '<div class="step"><div class="hd"><span class="kbadge">1</span><span class="txt">dominancia diagonal por filas: |a<sub>ii</sub>| &gt; Σ|a<sub>ij</sub>|</span></div>'+
+      '<div class="body wide"><div class="xscroll"><table><tr><th class="lbl">Fila</th><th>|a<sub>ii</sub>|</th><th>Σ resto</th><th>EDD</th><th>cociente</th></tr>'+rows+'</table></div></div></div>'+
+      '<div class="step"><div class="hd"><span class="kbadge">2</span><span class="txt">esquema: cada x<sub>i</sub> se despeja con los valores de la iteración anterior</span></div>'+
+      '<div class="body wide"><div class="ops">'+sch+'</div></div></div>'+
+      '<div class="step"><div class="hd"><span class="kbadge">3</span><span class="txt">error relativo e<sup>(k)</sup> = ‖x<sup>(k)</sup> − x<sup>(k−1)</sup>‖<sub>∞</sub> / ‖x<sup>(k)</sup>‖<sub>∞</sub> · se detiene cuando e &lt; '+tol+'</span></div></div>';
+
+    $("methchip").className="chip "+(edd?"ok":"bad");
+    $("methchip").textContent=edd?"jacobi · converge":"jacobi · sin garantía";
+    var det=luDet(); $("detchip").className="chip "+(Math.abs(det)>1e-10?"ok":"bad"); $("detchip").textContent="det = "+fmt(det);
+
+    if(zeroDiag){ $("itertab").innerHTML=""; $("xtiles").innerHTML='<div><small>x</small><strong>—</strong></div>'; $("restab").innerHTML=""; $("iterchip").textContent="—"; return; }
+
+    var xa=x0.slice(), hist=[{k:0,x:xa.slice(),e:null}], conv=false, k;
+    for(k=1;k<=maxit;k++){
+      var xn=new Array(n).fill(0);
+      for(i=0;i<n;i++){ var s2=b0[i]; for(j=0;j<n;j++) if(j!==i) s2-=A[i][j]*xa[j]; xn[i]=s2/A[i][i]; }
+      var dif=0,nm=0; for(i=0;i<n;i++){ dif=Math.max(dif,Math.abs(xn[i]-xa[i])); nm=Math.max(nm,Math.abs(xn[i])); }
+      var e=nm>0?dif/nm:dif;
+      hist.push({k:k,x:xn.slice(),e:e}); xa=xn;
+      if(!isFinite(e)) break;
+      if(e<tol){ conv=true; break; }
+    }
+    h="<table><tr><th class='lbl'>k</th>";
+    for(j=0;j<n;j++) h+="<th>x"+sb(j+1)+"</th>";
+    h+="<th>error</th></tr>";
+    hist.forEach(function(r,idx){
+      var last=conv&&idx===hist.length-1;
+      h+="<tr"+(last?" class='conv'":"")+"><td class='lbl'>"+r.k+"</td>";
+      r.x.forEach(function(v){ h+="<td>"+(isFinite(v)?v.toFixed(6):"—")+"</td>"; });
+      h+="<td class='dx'>"+(r.e===null?"—":r.e.toExponential(3))+"</td></tr>";
+    });
+    $("itertab").innerHTML=h+"</table>";
+    $("iterchip").className="chip "+(conv?"ok":"bad");
+    $("iterchip").textContent=conv?("converge en k = "+(hist.length-1)):("sin converger en "+maxit);
+
+    h=""; for(i=0;i<n;i++) h+='<div><small>x'+sb(i+1)+"</small><strong>"+fmt(xa[i])+"</strong></div>";
+    $("xtiles").innerHTML=h;
+    var maxr=0; h="<tr><th class='lbl'>Ec.</th><th>A·x</th><th>b</th><th>residuo</th></tr>";
+    for(i=0;i<n;i++){ var ax=0; for(j=0;j<n;j++) ax+=A[i][j]*xa[j]; var rr=ax-b0[i]; maxr=Math.max(maxr,Math.abs(rr));
+      h+="<tr><td class='lbl'>E"+(i+1)+"</td><td>"+fmt(ax)+"</td><td class='bcol'>"+fmt(b0[i])+"</td><td>"+rr.toExponential(1)+"</td></tr>"; }
+    $("restab").innerHTML=h;
+    $("reschip").className="chip "+(conv?"ok":"bad");
+    $("reschip").textContent="‖A·x − b‖∞ = "+maxr.toExponential(1);
+    $("costchip").className="chip"; $("costchip").textContent=(hist.length-1)+" iter × "+(2*n*n)+" flops";
+  }
+  function luDet(){
+    var M=copy(A),d=1,i,j,k;
+    for(k=0;k<n;k++){ var p=k; for(i=k+1;i<n;i++) if(Math.abs(M[i][k])>Math.abs(M[p][k])) p=i;
+      if(Math.abs(M[p][k])<1e-14) return 0; if(p!==k){ var t=M[p]; M[p]=M[k]; M[k]=t; d=-d; }
+      d*=M[k][k]; for(i=k+1;i<n;i++){ var m=M[i][k]/M[k][k]; for(j=k;j<n;j++) M[i][j]-=m*M[k][j]; } }
+    return d;
+  }
+
   function render(){
+    var isJ=(method==="jacobi");
+    $("cardParams").hidden=!isJ; $("cardIter").hidden=!isJ;
+    $("cardFac").hidden=isJ; $("cardSust").hidden=isJ; $("cardWaves").hidden=isJ;
+    if(isJ){ renderJacobi(); return; }
     var usePivot=$("pivot").checked&&method==="doolittle";
     var b0=bs[act],i,j,h,r;
 
@@ -641,7 +768,7 @@ L, U = doolittle(A)                        <span class="cmt"># una sola vez, O(n
     $("costchip").textContent=(fact+q*per)+" flops vs "+(q*(fact+per))+" recalculando";
   }
 
-  buildEditor(); buildB(); render();
+  buildEditor(); buildB(); buildX0(); render();
 })();
 </script>
 
